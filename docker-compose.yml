@@ -13,7 +13,7 @@ services:
   backend:
     build: ./backend
     env_file:
-      - .env
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://finsight:finsight@db:5432/finsight
     ports:
