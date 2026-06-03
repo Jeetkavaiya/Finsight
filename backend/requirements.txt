@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+httpx
+pytest
+# Added in later days:
+# llama-index           (agent + RAG)
+# psycopg[binary]       (Postgres driver)
+# pgvector              (vector column support)
+# sec-edgar-downloader  (SEC filings)
