@@ -5,8 +5,11 @@ pydantic-settings
 python-dotenv
 httpx
 pytest
-# Added in later days:
-# llama-index           (agent + RAG)
-# psycopg[binary]       (Postgres driver)
-# pgvector              (vector column support)
-# sec-edgar-downloader  (SEC filings)
+
+# ingestion (Gemini)
+psycopg[binary]
+pgvector
+sec-edgar-downloader
+beautifulsoup4
+lxml
+google-genai
