@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # FinSight — Agentic Financial Research Assistant
 
 Ask a plain-English question about a public company; FinSight's agent gathers
@@ -37,3 +38,6 @@ docker compose up --build
 ```bash
 cd backend && pytest
 ```
+=======
+# Finsight
+>>>>>>> 3e2975e3b503a4de6d4d8fb0b735d31e1bb4a38f
