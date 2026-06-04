@@ -13,3 +13,4 @@ sec-edgar-downloader
 beautifulsoup4
 lxml
 google-genai
+yfinance
