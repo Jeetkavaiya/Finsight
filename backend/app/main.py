@@ -1,8 +1,17 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from app.agent.loop import run
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="FinSight API", version="0.4.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:4173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Request / response models
 class QueryRequest(BaseModel):
