@@ -4,8 +4,13 @@ from google.genai import types
 from app.core.config import settings
 from app.core.db import get_connection
 
-client = genai.Client(api_key=settings.llm_api_key)
+_client = None
 
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=settings.llm_api_key)
+    return _client
 
 def _normalize(vector: list[float]) -> list[float]:
     """L2-normalize a vector. Required for truncated Gemini embeddings (<3072 dims)."""
