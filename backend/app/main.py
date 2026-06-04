@@ -1,16 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from app.retrieval.retriever import retrieve
-from app.agent.answer import answer
+from app.agent.loop import run
 
-app = FastAPI(title="FinSight API", version="0.3.0")
+app = FastAPI(title="FinSight API", version="0.4.0")
 
 # Request / response models
-
 class QueryRequest(BaseModel):
-    question: str = Field(..., min_length=5, description="Natural-language question about SEC filings")
-    ticker: str | None = Field(None, description="Optional: restrict search to one ticker (AAPL, MSFT, NVDA)")
-    top_k: int = Field(5, ge=1, le=20, description="Number of source chunks to retrieve")
+    question: str = Field(..., min_length=5, description="Natural-language question about SEC filings or market data")
+    ticker: str | None = Field(None, description="Optional: hint the agent toward one ticker (AAPL, MSFT, NVDA)")
+    top_k: int = Field(5, ge=1, le=10, description="Number of filing chunks to retrieve")
 
 
 class SourceItem(BaseModel):
@@ -24,19 +22,17 @@ class SourceItem(BaseModel):
 class QueryResponse(BaseModel):
     answer: str
     sources: list[SourceItem]
+    market_data: list[dict]
 
 # Routes
-
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "0.4.0"}
 
 
 @app.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest):
     try:
-        chunks = retrieve(req.question, top_k=req.top_k, ticker=req.ticker)
-        return answer(req.question, chunks)
+        return run(question=req.question, ticker_hint=req.ticker)
     except Exception as exc:
-        # Surface errors clearly during development
         raise HTTPException(status_code=500, detail=str(exc))
