@@ -18,7 +18,13 @@ from app.retrieval.retriever import retrieve
 from app.tools.market import get_market_data
 from app.agent.ticker import extract_tickers
 
-client = genai.Client(api_key=settings.llm_api_key)
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=settings.llm_api_key)
+    return _client
 
 # Tool Schema
 
