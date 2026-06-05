@@ -2,12 +2,21 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from app.agent.loop import run
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 app = FastAPI(title="FinSight API", version="0.4.0")
 
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:4173",
+]
+VERCEL_URL = os.getenv("VERCEL_URL", "")
+if VERCEL_URL:
+    ALLOWED_ORIGINS.append(VERCEL_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:4173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
