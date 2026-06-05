@@ -136,7 +136,7 @@ def run(question: str, ticker_hint: str | None = None) -> dict:
     routed_q = f"{ticker_note}{question}"
 
     # Turn 1: routing — Gemini picks tools
-    r1 = client.models.generate_content(
+    r1 = _get_client().models.generate_content(
         model=settings.llm_model,
         contents=routed_q,
         config=types.GenerateContentConfig(
@@ -213,7 +213,7 @@ def run(question: str, ticker_hint: str | None = None) -> dict:
     synthesis_prompt = "\n\n".join(context_parts) + f"\n\nQuestion: {question}"
 
     # Turn 2: synthesis — Gemini writes the cited answer
-    r2 = client.models.generate_content(
+    r2 = _get_client().models.generate_content(
         model=settings.llm_model,
         contents=synthesis_prompt,
         config=types.GenerateContentConfig(

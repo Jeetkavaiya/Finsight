@@ -32,7 +32,7 @@ def retrieve(question: str, top_k: int = 5, ticker: str | None = None) -> list[d
         List of dicts with keys: ticker, chunk_index, content, score (0–1).
     """
     # Embed the query — MUST use RETRIEVAL_QUERY here (not RETRIEVAL_DOCUMENT)
-    resp = client.models.embed_content(
+    resp = _get_client().models.embed_content(
         model=settings.embedding_model,
         contents=[question],
         config=types.EmbedContentConfig(
