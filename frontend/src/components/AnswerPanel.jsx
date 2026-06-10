@@ -1,38 +1,5 @@
 import { useState } from "react";
-
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-/** Parse inline [Source N] markers into React spans with highlighted chips */
-function parseAnswer(text) {
-  if (!text) return null;
-  // Split on [Source N] or [Source N, M, ...] patterns
-  const parts = text.split(/(\[Source\s[\d,\s]+\])/gi);
-  return parts.map((part, i) => {
-    if (/^\[Source/i.test(part)) {
-      return (
-        <cite key={i} className="source-inline">
-          {part}
-        </cite>
-      );
-    }
-    return part;
-  });
-}
-
-// ─── Sub-components ─────────────────────────────────────────────────────────
-
-function SkeletonLoader() {
-  return (
-    <div className="skeleton-wrap">
-      <div className="skeleton-bar w-90" />
-      <div className="skeleton-bar w-75" />
-      <div className="skeleton-bar w-85" />
-      <div className="skeleton-bar w-60" />
-      <div className="skeleton-spacer" />
-      <div className="skeleton-bar w-40" />
-    </div>
-  );
-}
+import ReactMarkdown from "react-markdown";
 
 function MarketDataBlock({ items }) {
   if (!items || items.length === 0) return null;
@@ -61,21 +28,21 @@ function MarketCard({ data }) {
   }
 
   const rows = [
-    { label: "Price",        value: data.price        ? `$${Number(data.price).toFixed(2)}` : "—" },
-    { label: "Mkt Cap",      value: data.market_cap   ?? "—" },
-    { label: "P/E (trail)",  value: data.pe_trailing  ?? "—" },
-    { label: "P/E (fwd)",    value: data.pe_forward   ?? "—" },
-    { label: "52W Range",    value: data["52w_range"] ?? data["52_week_range"] ?? "—" },
-    { label: "Rev TTM",      value: data.revenue_ttm  ?? "—" },
-    { label: "EPS",          value: data.eps          ?? "—" },
-    { label: "Analyst Tgt",  value: data.analyst_target ? `$${Number(data.analyst_target).toFixed(2)}` : "—" },
+    { label: "Price",       value: data.price          ? `$${Number(data.price).toFixed(2)}` : "—" },
+    { label: "Mkt Cap",     value: data.market_cap     ?? "—" },
+    { label: "P/E (trail)", value: data.pe_trailing    ?? "—" },
+    { label: "P/E (fwd)",   value: data.pe_forward     ?? "—" },
+    { label: "52W Range",   value: data["52w_range"]   ?? data["52_week_range"] ?? "—" },
+    { label: "Rev TTM",     value: data.revenue_ttm    ?? "—" },
+    { label: "EPS",         value: data.eps            ?? "—" },
+    { label: "Analyst Tgt", value: data.analyst_target ? `$${Number(data.analyst_target).toFixed(2)}` : "—" },
   ].filter((r) => r.value !== "—");
 
   return (
     <div className="market-card">
       <div className="market-card-header">
         <span className="market-ticker">{data.ticker}</span>
-        <span className="market-price">{rows.find(r => r.label === "Price")?.value ?? "—"}</span>
+        <span className="market-price">{rows.find((r) => r.label === "Price")?.value ?? "—"}</span>
       </div>
       <dl className="market-dl">
         {rows
@@ -93,13 +60,13 @@ function MarketCard({ data }) {
 
 function SourceCard({ source, index }) {
   const [open, setOpen] = useState(false);
-  const scorePercent    = source.score ? Math.round(source.score * 100) : null;
+  const scorePercent = source.score ? Math.round(source.score * 100) : null;
 
   return (
     <div className={`source-card ${open ? "open" : ""}`}>
       <button className="source-header" onClick={() => setOpen(!open)}>
         <div className="source-meta">
-          <span className="source-num">Source {source.index ?? index + 1}</span>
+          <span className="source-num">S{source.index ?? index + 1}</span>
           <span className="source-ticker-badge">{source.ticker}</span>
           {source.chunk_index != null && (
             <span className="source-chunk">chunk #{source.chunk_index}</span>
@@ -121,7 +88,18 @@ function SourceCard({ source, index }) {
   );
 }
 
-// ─── Main component ──────────────────────────────────────────────────────────
+function SkeletonLoader() {
+  return (
+    <div className="skeleton-wrap">
+      <div className="skeleton-bar w-90" />
+      <div className="skeleton-bar w-75" />
+      <div className="skeleton-bar w-85" />
+      <div className="skeleton-bar w-60" />
+      <div className="skeleton-spacer" />
+      <div className="skeleton-bar w-40" />
+    </div>
+  );
+}
 
 export default function AnswerPanel({ result, loading, question }) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
@@ -131,7 +109,7 @@ export default function AnswerPanel({ result, loading, question }) {
       <div className="answer-panel">
         <div className="answer-loading-label">
           <span className="pulse-dot" />
-          Querying filings…
+          Analyzing filings…
         </div>
         <SkeletonLoader />
       </div>
@@ -144,18 +122,14 @@ export default function AnswerPanel({ result, loading, question }) {
 
   return (
     <div className="answer-panel">
-      {/* Question echo */}
       <p className="answer-question">"{question}"</p>
 
-      {/* Answer body */}
       <div className="answer-body">
-        {parseAnswer(answer)}
+        <ReactMarkdown>{answer}</ReactMarkdown>
       </div>
 
-      {/* Market data */}
       <MarketDataBlock items={market_data} />
 
-      {/* Sources */}
       {sources.length > 0 && (
         <div className="sources-section">
           <button
