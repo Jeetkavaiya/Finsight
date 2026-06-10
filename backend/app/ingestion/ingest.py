@@ -1,7 +1,5 @@
 """
-Day 2 ingestion (Gemini): fetch SEC filings -> extract text -> chunk ->
-embed (Gemini, rate-limit friendly) -> store in pgvector.
-
+Ingest SEC filings for configured tickers: download, extract text, chunk, embed, and store.
 Run from backend/ with your venv active and the database running:
 
     python -m app.ingestion.ingest
@@ -28,8 +26,8 @@ client = genai.Client(api_key=settings.llm_api_key)
 DOWNLOAD_DIR = Path("data/edgar")
 
 # Free-tier friendly: embed a few chunks per request, pause between requests.
-EMBED_BATCH_SIZE = 5
-EMBED_SLEEP_SECONDS = 4
+EMBED_BATCH_SIZE = 20
+EMBED_SLEEP_SECONDS = 1
 
 
 def fetch_filings(ticker: str, form_type: str = "10-K", limit: int = 1) -> list[Path]:
@@ -94,7 +92,7 @@ def _normalize(vector: list[float]) -> list[float]:
     return [x / norm for x in vector]
 
 
-def _embed_batch(texts: list[str], max_retries: int = 5) -> list[list[float]]:
+def _embed_batch(texts: list[str], max_retries: int = 8) -> list[list[float]]:
     """Embed one small batch, waiting and retrying if we hit a rate limit (429)."""
     for attempt in range(max_retries):
         try:
@@ -145,6 +143,13 @@ def main() -> None:
     form_type = "10-K"
     with get_connection() as conn:
         for ticker in settings.tickers:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM chunks WHERE ticker = %s", (ticker,))
+                count = cur.fetchone()[0]
+            if count > 0:
+                print(f"  skipping {ticker} — {count} chunks already in DB")
+                continue
+
             print(f"Fetching {form_type} for {ticker} ...")
             docs = fetch_filings(ticker, form_type, limit=1)
             if not docs:
