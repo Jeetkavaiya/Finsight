@@ -1,14 +1,3 @@
-"""
-Agent loop for FinSight.
-
-Pattern: two-turn Gemini interaction.
-  Turn 1 (routing)   — Gemini sees the question + tool schemas, decides which tools to call.
-  [execution]        — We run the selected tools (retriever, yfinance).
-  Turn 2 (synthesis) — Gemini sees all tool results and writes the final cited answer.
-
-Fallback: if Turn 1 produces no function calls, we run a direct RAG retrieval.
-"""
-
 import json
 from google import genai
 from google.genai import types
@@ -26,14 +15,13 @@ def _get_client():
         _client = genai.Client(api_key=settings.llm_api_key)
     return _client
 
-# Tool Schema
-
 _TOOLS = types.Tool(
     function_declarations=[
         types.FunctionDeclaration(
             name="search_filings",
             description=(
-                "Search AAPL, MSFT, and NVDA SEC 10-K filings for relevant passages. "
+                "Search SEC 10-K filings for AAPL, MSFT, NVDA, GOOGL, META, AMZN, "
+                "JPM, BAC, GS, MS, JNJ, PFE, UNH, XOM, CVX, TSLA, WMT, KO, DIS, NFLX. "
                 "Use for any question about risks, strategy, revenue breakdown, products, "
                 "competition, R&D, management discussion, guidance, or other disclosures."
             ),
@@ -47,8 +35,9 @@ _TOOLS = types.Tool(
                     "ticker": types.Schema(
                         type=types.Type.STRING,
                         description=(
-                            "Restrict search to one ticker: AAPL, MSFT, or NVDA. "
-                            "Omit to search all three."
+                            "Restrict search to one ticker: AAPL, MSFT, NVDA, GOOGL, META, "
+                            "AMZN, JPM, BAC, GS, MS, JNJ, PFE, UNH, XOM, CVX, TSLA, WMT, "
+                            "KO, DIS, NFLX. Omit to search all."
                         ),
                     ),
                     "top_k": types.Schema(
@@ -71,7 +60,7 @@ _TOOLS = types.Tool(
                 properties={
                     "ticker": types.Schema(
                         type=types.Type.STRING,
-                        description="Ticker symbol, e.g. NVDA, AAPL, MSFT.",
+                        description="Ticker symbol, e.g. NVDA, AAPL, MSFT, GOOGL.",
                     ),
                 },
                 required=["ticker"],
@@ -80,13 +69,11 @@ _TOOLS = types.Tool(
     ]
 )
 
-# Prompts
-
 _ROUTER_SYSTEM = """\
 You are a financial research assistant routing a user question to the right data sources.
 
 Available tools:
-- search_filings: retrieves passages from AAPL, MSFT, NVDA 10-K SEC filings.
+- search_filings: retrieves passages from 20 company 10-K SEC filings (AAPL, MSFT, NVDA, GOOGL, META, AMZN, JPM, BAC, GS, MS, JNJ, PFE, UNH, XOM, CVX, TSLA, WMT, KO, DIS, NFLX).
 - get_market_data: returns live price, market cap, P/E, and other market stats.
 
 Rules:
@@ -109,24 +96,7 @@ Rules:
 - Be concise and direct. No padding or filler sentences.
 """
 
-# Agent entry point
-
 def run(question: str, ticker_hint: str | None = None) -> dict:
-    """
-    Run the agent on a user question.
-
-    Args:
-        question:    Natural-language question from the user.
-        ticker_hint: Optional ticker from the API request (overrides auto-detection).
-
-    Returns:
-        {
-            "answer":      str,          # cited prose answer
-            "sources":     list[dict],   # filing chunks used
-            "market_data": list[dict],   # live market data fetched (may be empty)
-        }
-    """
-    # Auto-detect tickers; hint takes priority
     tickers = extract_tickers(question)
     if ticker_hint:
         t = ticker_hint.upper()
@@ -135,7 +105,6 @@ def run(question: str, ticker_hint: str | None = None) -> dict:
     ticker_note = f"[Tickers detected: {', '.join(tickers)}] " if tickers else ""
     routed_q = f"{ticker_note}{question}"
 
-    # Turn 1: routing — Gemini picks tools
     r1 = _get_client().models.generate_content(
         model=settings.llm_model,
         contents=routed_q,
@@ -145,8 +114,6 @@ def run(question: str, ticker_hint: str | None = None) -> dict:
         ),
     )
 
-
-    # Execute tool calls
     rag_chunks: list[dict] = []
     market_results: list[dict] = []
     called_any = False
@@ -161,14 +128,12 @@ def run(question: str, ticker_hint: str | None = None) -> dict:
         args = dict(fc.args) if fc.args else {}
 
         if fc.name == "search_filings":
-            # Use hinted/detected ticker unless the model explicitly chose one
             ticker_arg = args.get("ticker") or (tickers[0] if tickers else None)
             chunks = retrieve(
                 question=args.get("question", question),
                 top_k=min(int(args.get("top_k", 5)), 10),
                 ticker=ticker_arg,
             )
-            # Deduplicate by (ticker, chunk_index) in case called twice
             seen_ids = {(c["ticker"], c["chunk_index"]) for c in rag_chunks}
             for c in chunks:
                 key = (c["ticker"], c["chunk_index"])
@@ -181,7 +146,6 @@ def run(question: str, ticker_hint: str | None = None) -> dict:
             if ticker_arg:
                 market_results.append(get_market_data(ticker_arg))
 
-    # Fallback: no tool calls — do a direct RAG retrieval
     if not called_any:
         rag_chunks = retrieve(question, top_k=5, ticker=tickers[0] if tickers else None)
 
@@ -192,8 +156,6 @@ def run(question: str, ticker_hint: str | None = None) -> dict:
             "market_data": [],
         }
 
-
-    # Build synthesis context
     context_parts: list[str] = []
 
     if rag_chunks:
@@ -212,7 +174,6 @@ def run(question: str, ticker_hint: str | None = None) -> dict:
 
     synthesis_prompt = "\n\n".join(context_parts) + f"\n\nQuestion: {question}"
 
-    # Turn 2: synthesis — Gemini writes the cited answer
     r2 = _get_client().models.generate_content(
         model=settings.llm_model,
         contents=synthesis_prompt,
