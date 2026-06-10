@@ -157,7 +157,7 @@ def main() -> None:
                 continue
             for doc in docs:
                 accession = doc.parent.name
-                chunks = chunk_text(extract_text(doc))
+                chunks = chunk_text(extract_text(doc))[:150]
                 print(f"  {ticker}: {len(chunks)} chunks — embedding ...")
                 embeddings = embed_texts(chunks)
                 store_chunks(conn, ticker, form_type, accession, chunks, embeddings)
