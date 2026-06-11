@@ -699,6 +699,16 @@ a { color: var(--blue); text-decoration: none; }
   margin: 0 auto;
 }
 
+.sources-empty {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  text-align: center;
+}
+
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 768px) {
   .hero { padding: 36px 16px 28px; }
@@ -708,7 +718,7 @@ a { color: var(--blue); text-decoration: none; }
   .results-grid { grid-template-columns: 1fr; }
   .market-grid { grid-template-columns: repeat(2, 1fr); }
   .empty-grid { grid-template-columns: 1fr; }
-  .search-input { padding-right: 110px; }
+  .search-input { padding-right: 120px; }
 }
 
 @media (max-width: 480px) {

@@ -91,6 +91,16 @@ export default function App() {
 
   const showResults = loading || result || error;
 
+  function friendlyError(msg) {
+    if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED"))
+      return "Gemini is rate-limited right now — quota resets at midnight Pacific. Try again soon.";
+    if (msg.includes("503") || msg.includes("UNAVAILABLE"))
+      return "Gemini is experiencing high demand. Please try again in a minute.";
+    if (msg.includes("timed out"))
+      return "Request timed out. The server may be starting up — try again in 30s.";
+    return "Something went wrong. Please try again.";
+  }
+
   return (
     <div className="app">
       {/* ── Nav ── */}
@@ -188,7 +198,7 @@ export default function App() {
         {error && (
           <div className="error-banner">
             <span>⚠</span>
-            <span>{error}</span>
+            <span>{friendlyError(error)}</span>
           </div>
         )}
 

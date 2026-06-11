@@ -147,16 +147,20 @@ export default function AnswerPanel({ result, loading, question }) {
         </div>
 
         {/* Right — Sources sidebar */}
-        {sources.length > 0 && (
-          <div className="sources-panel">
-            <div className="sources-header">
-              Sources · {sources.length} passage{sources.length !== 1 ? "s" : ""}
-            </div>
-            {sources.map((s, i) => (
-              <SourceCard key={i} source={s} index={i} />
-            ))}
+        <div className="sources-panel">
+          <div className="sources-header">
+            Sources · {sources.length} passage{sources.length !== 1 ? "s" : ""}
           </div>
-        )}
+          {sources.length > 0 ? (
+            sources.map((s, i) => (
+              <SourceCard key={i} source={s} index={i} />
+            ))
+          ) : (
+            <div className="sources-empty">
+              No filing passages retrieved for this query.
+            </div>
+          )}
+        </div>
 
         {/* Market data — spans full width */}
         {market_data.length > 0 && (
