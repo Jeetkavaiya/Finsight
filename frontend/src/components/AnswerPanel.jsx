@@ -1,154 +1,168 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
-function MarketDataBlock({ items }) {
+/* ── Market data section (full-width row below the 2-col grid) ── */
+function MarketSection({ items }) {
   if (!items || items.length === 0) return null;
+
+  // Build display cards from the first item (single-ticker queries)
+  // or show one card per ticker for multi-ticker queries
   return (
-    <div className="market-block">
-      <h3 className="block-title">
-        <span className="block-icon">◈</span> Live Market Data
-      </h3>
-      <div className="market-cards">
-        {items.map((m, i) => (
-          <MarketCard key={i} data={m} />
-        ))}
+    <div className="market-section">
+      <div className="market-section-title">
+        Live Market Data · {items.map((m) => m.ticker).join(", ")}
+      </div>
+      <div className="market-grid">
+        {items.map((m, i) =>
+          m.error ? (
+            <div key={i} className="market-card">
+              <div className="market-card-label">{m.ticker ?? "—"}</div>
+              <div className="market-card-value" style={{ fontSize: 13, color: "var(--red)" }}>
+                {m.error}
+              </div>
+            </div>
+          ) : (
+            <MarketCard key={i} data={m} />
+          )
+        )}
       </div>
     </div>
   );
 }
 
 function MarketCard({ data }) {
-  if (data.error) {
-    return (
-      <div className="market-card error-card">
-        <span className="market-ticker">{data.ticker || "—"}</span>
-        <span className="market-error">{data.error}</span>
-      </div>
-    );
-  }
-
-  const rows = [
-    { label: "Price",       value: data.price          ? `$${Number(data.price).toFixed(2)}` : "—" },
-    { label: "Mkt Cap",     value: data.market_cap     ?? "—" },
-    { label: "P/E (trail)", value: data.pe_trailing    ?? "—" },
-    { label: "P/E (fwd)",   value: data.pe_forward     ?? "—" },
-    { label: "52W Range",   value: data["52w_range"]   ?? data["52_week_range"] ?? "—" },
-    { label: "Rev TTM",     value: data.revenue_ttm    ?? "—" },
-    { label: "EPS",         value: data.eps            ?? "—" },
-    { label: "Analyst Tgt", value: data.analyst_target ? `$${Number(data.analyst_target).toFixed(2)}` : "—" },
-  ].filter((r) => r.value !== "—");
+  const price = data.price ? `$${Number(data.price).toFixed(2)}` : null;
+  const cap   = data.market_cap ?? null;
+  const pe    = data.pe_trailing ?? data.pe_forward ?? null;
+  const range = data["52w_range"] ?? data["52_week_range"] ?? null;
 
   return (
-    <div className="market-card">
-      <div className="market-card-header">
-        <span className="market-ticker">{data.ticker}</span>
-        <span className="market-price">{rows.find((r) => r.label === "Price")?.value ?? "—"}</span>
-      </div>
-      <dl className="market-dl">
-        {rows
-          .filter((r) => r.label !== "Price")
-          .map((r) => (
-            <div key={r.label} className="market-row">
-              <dt className="market-label">{r.label}</dt>
-              <dd className="market-value">{r.value}</dd>
-            </div>
-          ))}
-      </dl>
-    </div>
+    <>
+      {price && (
+        <div className="market-card">
+          <div className="market-card-label">Price</div>
+          <div className="market-card-value">{price}</div>
+          <div className="market-card-sub">{data.ticker}</div>
+        </div>
+      )}
+      {cap && (
+        <div className="market-card">
+          <div className="market-card-label">Market Cap</div>
+          <div className="market-card-value" style={{ fontSize: 16 }}>{cap}</div>
+          <div className="market-card-sub">&nbsp;</div>
+        </div>
+      )}
+      {pe && (
+        <div className="market-card">
+          <div className="market-card-label">P/E Ratio</div>
+          <div className="market-card-value">{pe}×</div>
+          <div className="market-card-sub">trailing</div>
+        </div>
+      )}
+      {range && (
+        <div className="market-card">
+          <div className="market-card-label">52-Week Range</div>
+          <div className="market-card-value" style={{ fontSize: 15 }}>{range}</div>
+          <div className="market-card-sub">&nbsp;</div>
+        </div>
+      )}
+    </>
   );
 }
 
+/* ── Source card (sidebar) ── */
 function SourceCard({ source, index }) {
   const [open, setOpen] = useState(false);
-  const scorePercent = source.score ? Math.round(source.score * 100) : null;
+  const num = source.index ?? index + 1;
+  const score = source.score ? Math.round(source.score * 100) : null;
 
   return (
     <div className={`source-card ${open ? "open" : ""}`}>
-      <button className="source-header" onClick={() => setOpen(!open)}>
+      <button className="source-header-btn" onClick={() => setOpen(!open)}>
         <div className="source-meta">
-          <span className="source-num">S{source.index ?? index + 1}</span>
+          <span className="source-num">S{num}</span>
           <span className="source-ticker-badge">{source.ticker}</span>
-          {source.chunk_index != null && (
-            <span className="source-chunk">chunk #{source.chunk_index}</span>
-          )}
+          {score != null && <span className="source-score">{score}%</span>}
         </div>
-        <div className="source-right">
-          {scorePercent != null && (
-            <span className="source-score">{scorePercent}% match</span>
-          )}
-          <span className={`chevron ${open ? "up" : "down"}`}>›</span>
-        </div>
+        <span className={`chevron ${open ? "up" : "down"}`}>›</span>
       </button>
       {open && (
         <div className="source-body">
           <p className="source-snippet">{source.snippet}</p>
+          <div className="source-form-row">
+            <span className="source-form-tag">10-K</span>
+            {source.chunk_index != null && (
+              <span className="source-form-tag">chunk {source.chunk_index}</span>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function SkeletonLoader() {
+/* ── Skeleton loader ── */
+function LoadingState() {
   return (
-    <div className="skeleton-wrap">
-      <div className="skeleton-bar w-90" />
-      <div className="skeleton-bar w-75" />
-      <div className="skeleton-bar w-85" />
-      <div className="skeleton-bar w-60" />
-      <div className="skeleton-spacer" />
-      <div className="skeleton-bar w-40" />
+    <div className="loading-state">
+      <div className="loading-ring" />
+      <p className="loading-text">Analyzing SEC filings…</p>
+      <p className="loading-sub">Retrieving relevant passages</p>
     </div>
   );
 }
 
+/* ── Main export ── */
 export default function AnswerPanel({ result, loading, question }) {
-  const [sourcesOpen, setSourcesOpen] = useState(false);
-
-  if (loading) {
-    return (
-      <div className="answer-panel">
-        <div className="answer-loading-label">
-          <span className="pulse-dot" />
-          Analyzing filings…
-        </div>
-        <SkeletonLoader />
-      </div>
-    );
-  }
-
+  if (loading) return <LoadingState />;
   if (!result) return null;
 
   const { answer, sources = [], market_data = [] } = result;
 
+  // Detect ticker from sources for the badge
+  const detectedTicker = sources[0]?.ticker ?? null;
+
   return (
     <div className="answer-panel">
-      <p className="answer-question">"{question}"</p>
-
-      <div className="answer-body">
-        <ReactMarkdown>{answer}</ReactMarkdown>
+      {/* Query echo bar */}
+      <div className="query-bar">
+        <span className="query-bar-label">Query</span>
+        <span className="query-bar-text">{question}</span>
+        {detectedTicker && (
+          <span className="ticker-badge">{detectedTicker}</span>
+        )}
       </div>
 
-      <MarketDataBlock items={market_data} />
-
-      {sources.length > 0 && (
-        <div className="sources-section">
-          <button
-            className="sources-toggle"
-            onClick={() => setSourcesOpen(!sourcesOpen)}
-          >
-            <span className="block-icon">⊞</span>
-            {sources.length} Filing Source{sources.length !== 1 ? "s" : ""}
-            <span className={`chevron ${sourcesOpen ? "up" : "down"}`}>›</span>
-          </button>
-          {sourcesOpen && (
-            <div className="sources-list">
-              {sources.map((s, i) => (
-                <SourceCard key={i} source={s} index={i} />
-              ))}
-            </div>
-          )}
+      {/* 2-column results grid */}
+      <div className="results-grid">
+        {/* Left — AI answer */}
+        <div className="answer-box">
+          <div className="answer-box-head">
+            <span className="answer-box-label">AI Answer</span>
+            <span className="answer-box-model">gemini-2.5-flash</span>
+          </div>
+          <div className="answer-body">
+            <ReactMarkdown>{answer}</ReactMarkdown>
+          </div>
         </div>
-      )}
+
+        {/* Right — Sources sidebar */}
+        {sources.length > 0 && (
+          <div className="sources-panel">
+            <div className="sources-header">
+              Sources · {sources.length} passage{sources.length !== 1 ? "s" : ""}
+            </div>
+            {sources.map((s, i) => (
+              <SourceCard key={i} source={s} index={i} />
+            ))}
+          </div>
+        )}
+
+        {/* Market data — spans full width */}
+        {market_data.length > 0 && (
+          <MarketSection items={market_data} />
+        )}
+      </div>
     </div>
   );
 }
