@@ -1,9 +1,3 @@
-"""
-Ingest SEC filings for configured tickers: download, extract text, chunk, embed, and store.
-Run from backend/ with your venv active and the database running:
-
-    python -m app.ingestion.ingest
-"""
 import math
 import time
 import warnings
@@ -20,14 +14,12 @@ from app.core.db import get_connection, init_db
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-# Google AI Studio client (free tier). Reads settings.llm_api_key.
 client = genai.Client(api_key=settings.llm_api_key)
 
 DOWNLOAD_DIR = Path("data/edgar")
 
-# Free-tier friendly: embed a few chunks per request, pause between requests.
-EMBED_BATCH_SIZE = 20
-EMBED_SLEEP_SECONDS = 1
+EMBED_BATCH_SIZE = 5
+EMBED_SLEEP_SECONDS = 4
 
 
 def fetch_filings(ticker: str, form_type: str = "10-K", limit: int = 1) -> list[Path]:
@@ -92,7 +84,7 @@ def _normalize(vector: list[float]) -> list[float]:
     return [x / norm for x in vector]
 
 
-def _embed_batch(texts: list[str], max_retries: int = 8) -> list[list[float]]:
+def _embed_batch(texts: list[str], max_retries: int = 3) -> list[list[float]]:
     """Embed one small batch, waiting and retrying if we hit a rate limit (429)."""
     for attempt in range(max_retries):
         try:
@@ -138,30 +130,45 @@ def store_chunks(conn, ticker, form_type, accession, chunks, embeddings) -> None
     conn.commit()
 
 
+def is_ingested(ticker: str) -> int:
+    """Return chunk count for ticker using a fresh short-lived connection."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM chunks WHERE ticker = %s", (ticker,))
+            return cur.fetchone()[0]
+
+
 def main() -> None:
     init_db()
     form_type = "10-K"
-    with get_connection() as conn:
-        for ticker in settings.tickers:
-            with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) FROM chunks WHERE ticker = %s", (ticker,))
-                count = cur.fetchone()[0]
-            if count > 0:
-                print(f"  skipping {ticker} — {count} chunks already in DB")
-                continue
 
-            print(f"Fetching {form_type} for {ticker} ...")
-            docs = fetch_filings(ticker, form_type, limit=1)
-            if not docs:
-                print(f"  no filing found for {ticker}")
-                continue
-            for doc in docs:
-                accession = doc.parent.name
-                chunks = chunk_text(extract_text(doc))[:150]
-                print(f"  {ticker}: {len(chunks)} chunks — embedding ...")
-                embeddings = embed_texts(chunks)
+    for ticker in settings.tickers:
+        # Fresh connection for the skip check avoids stale connection issues
+        count = is_ingested(ticker)
+        if count > 0:
+            print(f"  skipping {ticker} — {count} chunks already in DB")
+            continue
+
+        print(f"Fetching {form_type} for {ticker} ...")
+        docs = fetch_filings(ticker, form_type, limit=1)
+        if not docs:
+            print(f"  no filing found for {ticker}")
+            continue
+
+        for doc in docs:
+            accession = doc.parent.name
+            chunks = chunk_text(extract_text(doc))[:150]
+            print(f"  {ticker}: {len(chunks)} chunks — embedding ...")
+
+            # Embedding can take 10-20 minutes per ticker on free tier.
+            # Open a FRESH connection only after embedding is done to avoid
+            # Postgres dropping the idle connection mid-run.
+            embeddings = embed_texts(chunks)
+
+            with get_connection() as conn:
                 store_chunks(conn, ticker, form_type, accession, chunks, embeddings)
-                print(f"  stored {len(chunks)} chunks for {ticker}")
+            print(f"  stored {len(chunks)} chunks for {ticker}")
+
     print("Ingestion complete.")
 
 
