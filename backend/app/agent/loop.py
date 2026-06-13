@@ -7,13 +7,16 @@ from app.retrieval.retriever import retrieve
 from app.tools.market import get_market_data
 from app.agent.ticker import extract_tickers
 
+
 _client = None
+
 
 def _get_client():
     global _client
     if _client is None:
         _client = genai.Client(api_key=settings.llm_api_key)
     return _client
+
 
 _TOOLS = types.Tool(
     function_declarations=[
@@ -69,6 +72,7 @@ _TOOLS = types.Tool(
     ]
 )
 
+
 _ROUTER_SYSTEM = """\
 You are a financial research assistant routing a user question to the right data sources.
 
@@ -84,6 +88,7 @@ Rules:
 - Do NOT write an answer yet. Call tools only.
 """
 
+
 _SYNTHESIS_SYSTEM = """\
 You are FinSight, a financial research assistant. Answer the question using ONLY the \
 tool results below. Do not use prior knowledge.
@@ -95,6 +100,7 @@ Rules:
 - If the sources don't contain enough information, say so explicitly.
 - Be concise and direct. No padding or filler sentences.
 """
+
 
 def run(question: str, ticker_hint: str | None = None) -> dict:
     tickers = extract_tickers(question)
@@ -148,6 +154,14 @@ def run(question: str, ticker_hint: str | None = None) -> dict:
 
     if not called_any:
         rag_chunks = retrieve(question, top_k=5, ticker=tickers[0] if tickers else None)
+
+    fetched_tickers = {m["ticker"] for m in market_results}
+    filing_tickers = list(dict.fromkeys(c["ticker"] for c in rag_chunks))  # preserve order, dedupe
+    for t in filing_tickers:
+        if t not in fetched_tickers:
+            result = get_market_data(t)
+            market_results.append(result)
+            fetched_tickers.add(t)
 
     if not rag_chunks and not market_results:
         return {
