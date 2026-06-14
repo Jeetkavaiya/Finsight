@@ -11,6 +11,12 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    env:
+      SUPABASE_URL: https://placeholder.supabase.co
+      SUPABASE_KEY: placeholder_key
+      GEMINI_API_KEY: placeholder_key
+      EMBEDDING_MODEL: models/gemini-embedding-001
+      GENERATION_MODEL: gemini-2.5-flash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
