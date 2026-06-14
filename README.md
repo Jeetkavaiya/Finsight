@@ -102,8 +102,7 @@ Finsight/
 │   │   ├── tools/
 │   │   │   └── market.py        # yfinance market data tool
 │   │   └── main.py              # FastAPI app, /query endpoint
-│   ├── data/
-│   │   └── edgar/               # Downloaded 10-K filings (local only)
+│   ├── tests/                   # Pytest test suite
 │   ├── .env                     # Local env vars (not committed)
 │   └── requirements.txt
 ├── frontend/
@@ -116,7 +115,6 @@ Finsight/
 │   │   └── index.css            # Design system, CSS variables
 │   ├── .env                     # VITE_API_URL (not committed)
 │   └── package.json
-├── handoff.md                   # Session handoff document
 └── README.md
 ```
 
@@ -146,7 +144,7 @@ Create `backend/.env`:
 
 ```env
 DATABASE_URL=postgresql://postgres:[password]@db.[ref].supabase.co:5432/postgres
-LLM_API_KEY=your-google-ai-studio-key
+GEMINI_API_KEY=your-google-ai-studio-key
 SEC_EMAIL=your-email@example.com
 ```
 
@@ -169,7 +167,7 @@ python -m app.ingestion.ingest
 
 Downloads 10-K filings from SEC EDGAR, extracts text, chunks it, embeds with Gemini, and stores in Supabase. Skips tickers already in the database. Expect ~2–3 hours for all 20 tickers on the free tier due to Gemini rate limits (auto-retried with backoff).
 
-> **Gemini free tier**: 1,500 embedding requests/day. If ingestion stops with `RESOURCE_EXHAUSTED`, wait for the daily quota to reset (midnight Pacific) and re-run — completed tickers are automatically skipped.
+> **Gemini free tier**: 1,000 embedding requests/day. If ingestion stops with `RESOURCE_EXHAUSTED`, wait for the daily quota to reset (midnight Pacific) and re-run — completed tickers are automatically skipped.
 
 ### 4 — Start the backend
 
@@ -208,7 +206,7 @@ Open `http://localhost:5173`
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | ✅ | Supabase direct connection string (port 5432) |
-| `LLM_API_KEY` | ✅ | Google AI Studio API key — used for both embeddings and LLM |
+| `GEMINI_API_KEY` | ✅ | Google AI Studio API key — used for both embeddings and LLM |
 | `SEC_EMAIL` | ✅ | Contact email for SEC EDGAR User-Agent header |
 | `SEC_COMPANY` | optional | Company name for SEC EDGAR header (default: `FinSight`) |
 
@@ -223,7 +221,7 @@ Open `http://localhost:5173`
 | Variable | Value |
 |---|---|
 | `DATABASE_URL` | Supabase direct connection string |
-| `LLM_API_KEY` | Google AI Studio key |
+| `GEMINI_API_KEY` | Google AI Studio key |
 | `SEC_EMAIL` | Contact email |
 | `VERCEL_URL` | `https://finsight-sec.vercel.app` (for CORS) |
 
@@ -267,7 +265,7 @@ Submit a question and receive a cited answer.
 ```json
 {
   "question": "What risks did NVDA flag in their latest 10-K?",
-  "ticker_hint": "NVDA"
+  "ticker": "NVDA"
 }
 ```
 
@@ -319,7 +317,7 @@ Compare Apple and Microsoft's R&D spending
 
 ## Known Limitations
 
-- **Free-tier Gemini quota**: ~750 queries/day shared between ingestion and live queries. Monitor at [ai.dev/rate-limit](https://ai.dev/rate-limit).
+- **Free-tier Gemini quota**: 1,000 embedding requests/day and ~750 query requests/day. Monitor at [ai.dev/rate-limit](https://ai.dev/rate-limit).
 - **Render cold starts**: Backend sleeps after inactivity. First query after sleep takes 30–50s. The frontend shows a "waking up" banner after 5 seconds.
 - **Data freshness**: Ingests the most recent 10-K available on SEC EDGAR at time of ingestion. Filings are not automatically refreshed.
 - **Chunk cap**: Each company is capped at 150 chunks to stay within daily quota during ingestion. Very large filings (e.g. JPMorgan at 410 raw chunks) are truncated.
