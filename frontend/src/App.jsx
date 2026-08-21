@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AnswerPanel from "./components/AnswerPanel";
 import "./App.css";
 
@@ -37,6 +37,10 @@ export default function App() {
   const [error, setError]           = useState(null);
   const [lastQuery, setLastQuery]   = useState("");
 
+  useEffect(() => {
+    fetch(`${API_BASE}/health`).catch(() => {}); // fire-and-forget wake-up ping
+  }, []);
+
   async function handleQuery({ question: q, ticker }) {
     const trimmed = q.trim();
     if (!trimmed || loading) return;
@@ -49,7 +53,7 @@ export default function App() {
 
     const slowTimer   = setTimeout(() => setIsSlowLoad(true), 5000);
     const controller  = new AbortController();
-    const hardTimeout = setTimeout(() => controller.abort(), 60000);
+    const hardTimeout = setTimeout(() => controller.abort(), 90000); // was 60000
 
     try {
       const res = await fetch(`${API_BASE}/query`, {
