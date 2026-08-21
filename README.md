@@ -323,7 +323,3 @@ Compare Apple and Microsoft's R&D spending
 - **Chunk cap**: Each company is capped at 150 chunks to stay within daily quota during ingestion. Very large filings (e.g. JPMorgan at 410 raw chunks) are truncated.
 
 ---
-
-## License
-
-MIT
