@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from app.agent.loop import run
+from app.core.db import get_connection
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
@@ -46,6 +47,23 @@ class QueryResponse(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "0.4.0"}
+
+
+@app.get("/db-ping")
+def db_ping():
+    """Run a real query against Supabase without touching Gemini.
+
+    Used by the keep-alive workflow so the free-tier project registers
+    database activity even when the LLM API is down or rate-limited.
+    """
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT count(*) FROM chunks;")
+                (count,) = cur.fetchone()
+        return {"status": "ok", "chunks": count}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"database unreachable: {exc}")
 
 
 @app.post("/query", response_model=QueryResponse)

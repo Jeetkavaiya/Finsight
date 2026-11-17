@@ -1,27 +1,48 @@
 name: Keep FinSight Alive
 
+# Two jobs in one:
+#  1. Query Supabase (via the Render backend) so the free-tier project is never
+#     idle for 7 days and paused.
+#  2. Re-enable this workflow through the GitHub API, which resets GitHub's
+#     60-day "no repository activity" timer that silently disabled it before.
+
 on:
   schedule:
-    - cron: "0 9 */2 * *"
-  workflow_dispatch: {}  # lets you trigger it manually from the Actions tab
+    - cron: "17 9 * * *"   # daily; Supabase pauses after 7 idle days
+  workflow_dispatch: {}     # manual trigger from the Actions tab
+
+permissions:
+  actions: write            # needed to call the "enable workflow" API
+  contents: read
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Wake and query the backend
+      - name: Wake Render and query Supabase
+        env:
+          BACKEND_URL: https://finsight-api-7nw1.onrender.com
         run: |
-          # Replace with your actual Render backend URL (no trailing slash)
-          BACKEND_URL="https://finsight-api-7nw1.onrender.com"
+          # Render free instances can take ~1 min to cold-start, so retry.
+          curl -sS --fail --retry 6 --retry-delay 20 --retry-all-errors \
+            --max-time 90 -o /dev/null -w "health status: %{http_code}\n" \
+            "$BACKEND_URL/health"
 
-          echo "Hitting /health first to wake a sleeping Render instance..."
-          curl -s -o /dev/null -w "health status: %{http_code}\n" "$BACKEND_URL/health" || true
+          # /db-ping runs SELECT count(*) FROM chunks directly. It does not
+          # call Gemini, so an LLM outage can no longer skip the DB hit.
+          # --fail makes the job go red if Supabase is unreachable or paused.
+          curl -sS --fail --retry 4 --retry-delay 15 --retry-all-errors \
+            --max-time 60 -w "\ndb-ping status: %{http_code}\n" \
+            "$BACKEND_URL/db-ping"
 
-          echo "Waiting 45s in case the service was cold-starting..."
-          sleep 45
-
-          echo "Sending a real /query request so Supabase sees DB activity..."
-          curl -s -X POST "$BACKEND_URL/query" \
-            -H "Content-Type: application/json" \
-            -d '{"question": "What are Apple main revenue segments"}' \
-            -w "\nquery status: %{http_code}\n"
+  keep-workflow-enabled:
+    runs-on: ubuntu-latest
+    if: ${{ always() }}      # run even if the ping failed
+    steps:
+      - name: Reset GitHub's 60-day inactivity timer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X PUT \
+            "repos/${{ github.repository }}/actions/workflows/keep-alive.yml/enable"
+          echo "Workflow re-enabled; inactivity counter reset."
